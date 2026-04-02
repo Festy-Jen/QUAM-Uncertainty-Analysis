@@ -14,12 +14,15 @@ from helper_functions import (
 
 #---------------ESTABLISHING-DIRECTORIES----------------------
 
+#takes format: algoname_datasetname_preds.pkl
+#example: mcdo_mnist_preds.pkl
+#example: quam_emnist_preds.pkl
 ALGORITHM_NAME = "quam"
-DATASET_NAME = "mnist"
+DATASET_NAME = "emnist"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
 MATH_SETTING = "B"
-N_SAMPLES = 100
+N_SAMPLES = 1000
 
 #---------------LOADING-DATA--------------------------------------
 
@@ -32,7 +35,7 @@ avg_pred = torch.as_tensor(data['average_net_pred']) #.to(device)
 samples = torch.as_tensor(data['sample_preds']) #.to(device)
 targets = torch.as_tensor(data['target']) #.to(device)
 
-#----------------NECCESARY-CHECKS----------------------
+#----------------NECCESARY-CHECKS---------------------
 
 # Our functions expects 4D setting, but we have only 3D, 
 # Hence we plug in 1 as second parameter, by telling to create 1 on index 2
