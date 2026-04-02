@@ -47,7 +47,6 @@ def calculate_uncertainty_setting_b(
 
 
 
-
 def calculate_uncertainty_setting_a(
     average_net_pred: torch.Tensor,
     sample_preds: torch.Tensor,
@@ -61,11 +60,11 @@ def calculate_uncertainty_setting_a(
     :return:
     '''
     if sample_weights is None:
-        total = - torch.sum(torch.mean(sample_preds, dim=(0, 1)) * torch.log(torch.mean(sample_preds, dim=(0, 1))), dim=0)
+        total = - torch.sum(torch.mean(sample_preds, dim=(0, 1)) * torch.log(torch.mean(sample_preds, dim=(0, 1))), dim=-1)
         aleatoric = - torch.mean(torch.sum(sample_preds * torch.log(sample_preds), dim=-1), dim=(0, 1))
         epistemic = total - aleatoric
     else:
-        total = - torch.sum(torch.sum(sample_preds*sample_weights, dim=(0, 1)) * torch.log(torch.sum(sample_preds*sample_weights, dim=(0, 1))), dim=0)
+        total = - torch.sum(torch.sum(sample_preds*sample_weights, dim=(0, 1)) * torch.log(torch.sum(sample_preds*sample_weights, dim=(0, 1))), dim=-1)
         aleatoric = - torch.mean(torch.sum(sample_preds * torch.log(sample_preds), dim=-1), dim=(0, 1))
         epistemic = total - aleatoric
 
@@ -86,9 +85,13 @@ def evaluate_score(y, score):
         'AUPR': auc(recall, precision).item(),
     }
 
+
+
 def fpr_at_tpr_x(y_true, score, x=0.95):
     fpr, tpr, _ = roc_curve(y_true, score)
     return fpr[(np.abs(tpr - x)).argmin()]
+
+
 
 def evaluate_missclass(
     id_uncerts,
