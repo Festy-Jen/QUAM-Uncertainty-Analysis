@@ -1,0 +1,17 @@
+# Ignore ML data dumps and weights
+*.pkl
+*.pt
+*.pth
+*.npy
+
+# Ignore datasets
+data/
+datasets/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment files
+.env
+venv/
