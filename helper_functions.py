@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from sklearn.metrics import roc_curve, roc_auc_score, auc, precision_recall_curve
+import matplotlib.pyplot as plt
 
 def calculate_uncertainty_setting_b(
     average_net_pred: torch.Tensor,
@@ -92,7 +93,7 @@ def fpr_at_tpr_x(y_true, score, x=0.95):
     return fpr[(np.abs(tpr - x)).argmin()]
 
 
-
+#retention
 def evaluate_missclass(
     id_uncerts,
     id_uncerts_target,
@@ -104,3 +105,43 @@ def evaluate_missclass(
     # the correct predictions - class 0, should be associated with lower uncertainty values\
     # the incorrect - class 1 with higher uncertainties
     return evaluate_score(accuracy_scores, id_uncerts.float())
+
+
+
+def plot_uncertainty_correlation(
+        aleatoric, epistemic, 
+        title, filename,
+        x_lims=(1e-13, 1e1), y_lims=(1e-14, 1e0)
+):
+    print(f"Generating {title} Plot...")
+
+    fig, ax = plt.subplots(figsize=(8,8), dpi=100)
+
+    hb = ax.hexbin(
+        aleatoric, epistemic,
+        gridsize=100,
+        cmap='plasma',
+        bins='log',
+        xscale='log',yscale='log',
+        mincnt=1,
+        edgecolors='none'
+    )
+
+    ax.set_xlim(*x_lims)
+    ax.set_ylim(*y_lims)
+
+    ax.set_xlabel('Aleatoric Uncertainty', color='royalblue', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Epistemic Uncertainty', color='firebrick', fontsize=12, fontweight='bold')
+    ax.set_title(title, fontsize=14, pad=15)
+
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+
+    # colorbar with the temperature at the side
+    cb = fig.colorbar(hb, ax=ax, shrink=0.8, pad=0.02)
+    cb.set_label('Log10', fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(f"{filename}", bbox_inches='tight', dpi=300)
+    print(f"Success! Saved as {filename}")
+    plt.show()
