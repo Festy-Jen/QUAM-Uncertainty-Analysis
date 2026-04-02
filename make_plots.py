@@ -1,90 +1,109 @@
+#---------------LIBRARIES--------------------------------------
+
 import torch
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-from helper_functions import calculate_uncertainty_setting_a, calculate_uncertainty_setting_b, evaluate_missclass
+from helper_functions import (
+    calculate_uncertainty_setting_a, 
+    calculate_uncertainty_setting_b, 
+    evaluate_missclass
+)
 
-# ==========================================
-# 1. LOAD DATA
-# ==========================================
-pkl_file_path = r"data/mnist_preds.pkl" 
-print(f"Loading {pkl_file_path} ...")
+#---------------ESTABLISHING-DIRECTORIES----------------------
 
-with open(pkl_file_path, 'rb') as f:
+DATASET_NAME = "emnist"
+INPUT_FILE = f"data/{DATASET_NAME}_preds.pkl"
+RESULTS_DIR = "results"
+
+#---------------LOADING-DATA--------------------------------------
+
+print(f"--- Loading: {DATASET_NAME.upper()} ---")
+
+with open(INPUT_FILE, 'rb') as f:
     data = pickle.load(f)
 
-average_net_pred = data['average_net_pred']
-sample_preds = data['sample_preds']
+avg_pred = torch.as_tensor(data['average_net_pred']) #.to(device)
+samples = torch.as_tensor(data['sample_preds']) #.to(device)
+targets = torch.as_tensor(data['target']) #.to(device)
 
-# Ensure they are PyTorch tensors
-if not isinstance(average_net_pred, torch.Tensor):
-    average_net_pred = torch.tensor(average_net_pred)
-if not isinstance(sample_preds, torch.Tensor):
-    sample_preds = torch.tensor(sample_preds)
+#----------------NECCESARY-CHECKS----------------------
 
-print(f"Original sample_preds shape: {sample_preds.shape}")
+#our functions expects 4d setting, but we have only 3d, 
+#so we plug in 1 as second parameter
 
-# ==========================================
-# 2. SANITIZE DATA (THE BUG FIXES)
-# ==========================================
-# Fix 1: Shape Check. Mykyta's setting_a needs [samples, models, points, classes]
-# If the first dimension is massive (e.g., 10000 points), it's in the wrong order.
-if sample_preds.shape[0] >= 1000:
-    if len(sample_preds.shape) == 3: # [points, samples, classes] -> [samples, 1, points, classes]
-        sample_preds = sample_preds.permute(1, 0, 2).unsqueeze(1)
-        average_net_pred = average_net_pred.unsqueeze(0).unsqueeze(1) # [1, 1, points, classes]
-    elif len(sample_preds.shape) == 4: # [points, samples, models, classes] -> [samples, models, points, classes]
-        sample_preds = sample_preds.permute(1, 2, 0, 3)
+if samples.dim() == 3:
+    samples = samples.unsqueeze(2)
 
-print(f"Corrected sample_preds shape: {sample_preds.shape}")
+# 2. Prevent NaNs and Negative Logits for BOTH tensors
+if samples.min() < 0 or samples.max() > 1:
+    samples = torch.softmax(samples, dim=-1)
+    avg_pred = torch.softmax(avg_pred, dim=-1)
 
-# Fix 2: If they are raw logits (contain negatives), convert to probabilities
-if sample_preds.min() < 0.0 or sample_preds.max() > 1.0:
-    print("Detected raw logits! Applying softmax...")
-    sample_preds = torch.softmax(sample_preds, dim=-1)
-    average_net_pred = torch.softmax(average_net_pred, dim=-1)
+samples = torch.clamp(samples, min=1e-10, max=1.0)
+avg_pred = torch.clamp(avg_pred, min=1e-10, max=1.0)
 
-# Fix 3: Prevent log(0) NaNs by clamping perfectly zero probabilities
-eps = 1e-10
-sample_preds = torch.clamp(sample_preds, min=eps, max=1.0)
-average_net_pred = torch.clamp(average_net_pred, min=eps, max=1.0)
+# 3. Shape Permutation! 
+# Setting A needs: [Samples, Models, Points, Classes]
+samples_a = samples.permute(1, 2, 0, 3)
 
-# ==========================================
-# 3. RUN MYKYTA'S MATH
-# ==========================================
-print("Calculating Yarin Gal's Decomposition...")
-gal_results = calculate_uncertainty_setting_a(average_net_pred, sample_preds)
+#----------------RUNNING-SCRIPT----------------------
 
+gal_results = calculate_uncertainty_setting_a(avg_pred, samples_a)
+
+print("Data was successfully calculated...")
+
+#we transform it so matplot lib can see numpy.arrays
+
+#the data is messy
 aleatoric_gal = gal_results['aleatoric'].numpy()
+#the data was not learned
 epistemic_gal = gal_results['epistemic'].numpy()
 
-# Debug: Check if NaNs survived
-print(f"NaNs in Aleatoric: {np.isnan(aleatoric_gal).sum()}")
-print(f"NaNs in Epistemic: {np.isnan(epistemic_gal).sum()}")
+print("Data was successfully transformed...")
 
-# ==========================================
-# 4. DRAW CORRELATION PLOT
-# ==========================================
-print("Generating Correlation Plot...")
-plt.figure(figsize=(6, 6))
+#----------------DRAWING-PLOT----------------------
 
-# Added explicit limits to force Matplotlib to look at the right area
-plt.hexbin(aleatoric_gal, epistemic_gal, gridsize=100, cmap='plasma', 
-           bins='log', xscale='log', yscale='log', mincnt=1)
+def plot_uncertainty_correlation(
+        aleatoric, epistemic, 
+        title, filename,
+        x_lims=(1e-13, 1e1), y_lims=(1e-14, 1e0)
+):
+    print(f"Generating {DATASET_NAME} Plot...")
 
-# Setting limits explicitly to match the paper
-plt.xlim(10**-13, 10**1)
-plt.ylim(10**-14, 10**0)
+    fig, ax = plt.subplots(figsize=(8,8), dpi=100)
 
-plt.xlabel('Aleatoric Uncertainty', color='blue', fontsize=12)
-plt.ylabel('Epistemic Uncertainty', color='darkred', fontsize=12)
-plt.title('MC Dropout: Entangled Uncertainties (MNIST)', fontsize=14)
+    hb = ax.hexbin(
+        aleatoric, epistemic,
+        gridsize=100,
+        cmap='plasma',
+        bins='log',
+        xscale='log',yscale='log',
+        mincnt=1,
+        edgecolors='none'
+    )
 
-ax = plt.gca()
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    ax.set_xlim(*x_lims)
+    ax.set_ylim(*y_lims)
 
-plt.tight_layout()
-plt.savefig("results/correlation_gal_mnist.png", dpi=300)
-print("✅ Success! Saved as correlation_gal_mnist.png")
-plt.show()
+    ax.set_xlabel('Aleatoric Uncertainty', color='royalblue', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Epistemic Uncertainty', color='firebrick', fontsize=12, fontweight='bold')
+    ax.set_title(title, fontsize=14, pad=15)
+
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+
+    # colorbar with the temperature at the side
+    cb = fig.colorbar(hb, ax=ax, shrink=0.8, pad=0.02)
+    cb.set_label('Log10', fontsize=10)
+
+    fig.tight_layout()
+    fig.savefig(f"{filename}", bbox_inches='tight', dpi=300)
+    print(f"Success! Saved as {filename}")
+    plt.show()
+
+plot_uncertainty_correlation(
+    aleatoric_gal, epistemic_gal,
+    f'MC Dropout: Entangled Uncertainties ({DATASET_NAME})',
+    f'correlation_gal_{DATASET_NAME}.png',
+)

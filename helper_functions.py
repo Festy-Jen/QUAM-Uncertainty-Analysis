@@ -80,9 +80,9 @@ def evaluate_score(y, score):
 
     precision, recall, _ = precision_recall_curve(y, score)
     return {
-        'FPR': fpr_at_tpr_x(y, score).item(),
-        'AUROC': roc_auc_score(y, score).item(),
-        'AUPR': auc(recall, precision).item(),
+        'FPR': float(fpr_at_tpr_x(y, score)),
+        'AUROC': float(roc_auc_score(y, score)),
+        'AUPR': float(auc(recall, precision)),
     }
 
 
