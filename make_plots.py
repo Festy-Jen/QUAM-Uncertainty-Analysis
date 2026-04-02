@@ -2,12 +2,12 @@ import torch
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-from helper_functions import calculate_uncertainty_setting_a
+from helper_functions import calculate_uncertainty_setting_a, calculate_uncertainty_setting_b, evaluate_missclass
 
 # ==========================================
 # 1. LOAD DATA
 # ==========================================
-pkl_file_path = r"data/emnist_preds.pkl" 
+pkl_file_path = r"data/mnist_preds.pkl" 
 print(f"Loading {pkl_file_path} ...")
 
 with open(pkl_file_path, 'rb') as f:
