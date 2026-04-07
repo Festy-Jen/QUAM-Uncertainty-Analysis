@@ -18,7 +18,7 @@ from helper_functions import (
 #example: mcdo_mnist_preds.pkl
 #example: quam_emnist_preds.pkl
 ALGORITHM_NAME = "quam"
-DATASET_NAME = "emnist"
+DATASET_NAME = "mnist"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
 MATH_SETTING = "B"
@@ -87,4 +87,19 @@ plot_uncertainty_correlation(
     title=f'{ALGORITHM_NAME.upper()} Entangled Uncertainties ({DATASET_NAME.upper()})',
     filename=os.path.join(RESULTS_DIR, f'correlation_{ALGORITHM_NAME.upper()}_{DATASET_NAME.upper()}.png')
 )
+
+#----------------EVALUATING-RETENTION-(MISCLASS)----------------------
+print("\n--- Retention Metrics (Using EPISTEMIC) ---")
+
+# We use the epistemic tensor to prove QUAM isolates the lack of knowledge!
+metrics = evaluate_missclass(
+    id_uncerts=math_results['epistemic'], 
+    id_uncerts_target=targets, 
+    id_uncerts_average_net_pred=avg_pred
+)
+
+print(f"AUROC: {metrics['AUROC']:.4f} (Higher is better)")
+print(f"AUPR:  {metrics['AUPR']:.4f}  (Higher is better)")
+print(f"FPR95: {metrics['FPR']:.4f}  (Lower is better)")
+print("-------------------------\n")
 
