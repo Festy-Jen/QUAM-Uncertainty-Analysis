@@ -17,12 +17,19 @@ from helper_functions import (
 #takes format: algoname_datasetname_preds.pkl
 #example: mcdo_mnist_preds.pkl
 #example: quam_emnist_preds.pkl
-ALGORITHM_NAME = "quam"
-DATASET_NAME = "mnist"
+ALGORITHM_NAME = "mcdo"
+DATASET_NAME = "cifar10"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
-MATH_SETTING = "B"
+MATH_SETTING = "A"
 N_SAMPLES = 1000
+
+PLOT_SETTINGS = {
+    "mnist":   {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
+    "emnist":  {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
+    "cifar10": {"x_lim": (1e-6, 1e1),  "y_lim": (1e-6, 1e1)}
+}
+current_limits = PLOT_SETTINGS[DATASET_NAME]
 
 #---------------LOADING-DATA--------------------------------------
 
@@ -85,7 +92,9 @@ plot_uncertainty_correlation(
     aleatoric=aleatoric, 
     epistemic=epistemic,
     title=f'{ALGORITHM_NAME.upper()} Entangled Uncertainties ({DATASET_NAME.upper()})',
-    filename=os.path.join(RESULTS_DIR, f'correlation_{ALGORITHM_NAME.upper()}_{DATASET_NAME.upper()}.png')
+    filename=os.path.join(RESULTS_DIR, f'correlation_{ALGORITHM_NAME.upper()}_{DATASET_NAME.upper()}_setting_{MATH_SETTING}.png'),
+    x_lims=current_limits["x_lim"], 
+    y_lims=current_limits["y_lim"]
 )
 
 #----------------EVALUATING-RETENTION-(MISCLASS)----------------------

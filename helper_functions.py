@@ -111,7 +111,8 @@ def evaluate_missclass(
 def plot_uncertainty_correlation(
         aleatoric, epistemic, 
         title, filename,
-        x_lims=(1e-13, 1e1), y_lims=(1e-14, 1e0)
+        x_lims, 
+        y_lims
 ):
     print(f"Generating {title} Plot...")
 
