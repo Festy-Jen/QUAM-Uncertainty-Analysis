@@ -17,17 +17,27 @@ from helper_functions import (
 #takes format: algoname_datasetname_preds.pkl
 #example: mcdo_mnist_preds.pkl
 #example: quam_emnist_preds.pkl
-ALGORITHM_NAME = "quam"
-DATASET_NAME = "cifar10"
+ALGORITHM_NAME = "ensembles"
+DATASET_NAME = "mnist"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
-MATH_SETTING = "B"
+MATH_SETTING = "A"
 N_SAMPLES = 1000
 
 PLOT_SETTINGS = {
     "mnist":   {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
     "emnist":  {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
-    "cifar10": {"x_lim": (1e-6, 1e1),  "y_lim": (1e-1, 20e1)}
+    "cifar10": {"x_lim": (1e-4, 5e1),  "y_lim": (1e-5, 5e1)}   
+    #setting a 
+    # cifar10 
+    # mcdo : {"x_lim": (1e-4, 5e1),  "y_lim": (1e-5, 5e1)}   
+    # quam : "cifar10": {"x_lim": (1e-3, 5e0),  "y_lim": (1e-1, 1e1)} 
+
+    # setting b 
+    # cifar10 
+    # mcdo : {"x_lim": (1e-4, 5e1),  "y_lim": (1e-5, 5e1)} 
+    # quam: {"x_lim": (1e-4, 1e1),  "y_lim": (1e-2, 5e2)}
+    
 }
 current_limits = PLOT_SETTINGS[DATASET_NAME]
 
@@ -96,5 +106,3 @@ plot_uncertainty_correlation(
     x_lims=current_limits["x_lim"], 
     y_lims=current_limits["y_lim"]
 )
-
-#----------------EVALUATING-RETENTION-(MISCLASS)----------------------
