@@ -21,11 +21,14 @@ ALGORITHM_NAME = "ensembles"
 DATASET_NAME = "mnist"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
-MATH_SETTING = "A"
+MATH_SETTING = "B"
 N_SAMPLES = 1000
 
 PLOT_SETTINGS = {
-    "mnist":   {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
+    "mnist":   {"x_lim": (1e-15, 1e6), "y_lim": (1e-15, 1e6)},
+    #setting a
+    #mnist
+    # ensembles: {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
     "emnist":  {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
     "cifar10": {"x_lim": (1e-4, 5e1),  "y_lim": (1e-5, 5e1)}   
     #setting a 
