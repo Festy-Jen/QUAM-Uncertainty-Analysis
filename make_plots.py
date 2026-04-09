@@ -17,17 +17,17 @@ from helper_functions import (
 #takes format: algoname_datasetname_preds.pkl
 #example: mcdo_mnist_preds.pkl
 #example: quam_emnist_preds.pkl
-ALGORITHM_NAME = "mcdo"
+ALGORITHM_NAME = "quam"
 DATASET_NAME = "cifar10"
 INPUT_FILE = f"data/{ALGORITHM_NAME}_{DATASET_NAME}_preds.pkl"
 RESULTS_DIR = "results"
-MATH_SETTING = "A"
+MATH_SETTING = "B"
 N_SAMPLES = 1000
 
 PLOT_SETTINGS = {
     "mnist":   {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
     "emnist":  {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
-    "cifar10": {"x_lim": (1e-6, 1e1),  "y_lim": (1e-6, 1e1)}
+    "cifar10": {"x_lim": (1e-6, 1e1),  "y_lim": (1e-1, 20e1)}
 }
 current_limits = PLOT_SETTINGS[DATASET_NAME]
 
@@ -98,17 +98,3 @@ plot_uncertainty_correlation(
 )
 
 #----------------EVALUATING-RETENTION-(MISCLASS)----------------------
-print("\n--- Retention Metrics (Using EPISTEMIC) ---")
-
-# We use the epistemic tensor to prove QUAM isolates the lack of knowledge!
-metrics = evaluate_missclass(
-    id_uncerts=math_results['epistemic'], 
-    id_uncerts_target=targets, 
-    id_uncerts_average_net_pred=avg_pred
-)
-
-print(f"AUROC: {metrics['AUROC']:.4f} (Higher is better)")
-print(f"AUPR:  {metrics['AUPR']:.4f}  (Higher is better)")
-print(f"FPR95: {metrics['FPR']:.4f}  (Lower is better)")
-print("-------------------------\n")
-
