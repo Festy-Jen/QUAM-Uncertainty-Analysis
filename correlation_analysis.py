@@ -1,138 +1,180 @@
 import os
-import torch
 import pickle
+from typing import Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from helper_functions import calculate_uncertainty_setting_a, calculate_uncertainty_setting_b
+import torch
+from scipy.stats import pearsonr, spearmanr
 
-DATASET_NAME = "emnist"
-RESULTS_DIR = "results"
-N_SAMPLES = 1000
-os.makedirs(RESULTS_DIR, exist_ok=True)
-#------
-def get_uncertainties(algorithm_name, math_setting):
-    input_file = f"data/{algorithm_name}_{DATASET_NAME}_preds.pkl"
-    print(f"Loading {input_file} for Setting {math_setting}...")
-    
-    with open(input_file, 'rb') as f:
-        data = pickle.load(f)
+from helper_functions import (
+    calculate_uncertainty_setting_a,
+    calculate_uncertainty_setting_b,
+    plot_uncertainty_correlation,
+)
 
-    avg_pred = torch.as_tensor(data['average_net_pred'])
-    samples = torch.as_tensor(data['sample_preds'])
 
+# -----------------------------------------------------------------------------
+# MAIN PRACTICAL CONFIGURATION
+# -----------------------------------------------------------------------------
+# Edit this block for your usual single-run workflow.
+BASE_CONFIG = {
+    "algorithm_name": "ensembles",
+    "dataset_name": "mnist",
+    "math_setting": "A",
+    "results_dir": "results",
+    "n_samples": 1000,
+    "value_clip_floor": 1e-14,
+    "probability_floor": 1e-10,
+}
+
+# Plot limits can differ by dataset and practical setup.
+PLOT_SETTINGS = {
+    "mnist": {"x_lim": (1e-15, 1e6), "y_lim": (1e-15, 1e6)},
+    "emnist": {"x_lim": (1e-13, 1e1), "y_lim": (1e-14, 1e0)},
+    "cifar10": {"x_lim": (1e-4, 5e1), "y_lim": (1e-5, 5e1)},
+}
+
+# Add scenarios when you want to compare adjustments in one execution.
+EXPERIMENT_SCENARIOS = [
+    {"name": "default", "overrides": {}},
+    {"name": "setting_b", "overrides": {"math_setting": "B"}},
+]
+
+
+def merge_config(base: Dict, overrides: Dict) -> Dict:
+    merged = dict(base)
+    merged.update(overrides)
+    return merged
+
+
+def load_prediction_tensors(dataset_name: str, algorithm_name: str) -> Tuple[torch.Tensor, torch.Tensor]:
+    input_file = f"data/{algorithm_name}_{dataset_name}_preds.pkl"
+    print(f"Loading file: {input_file}")
+    with open(input_file, "rb") as file_obj:
+        data = pickle.load(file_obj)
+    avg_pred = torch.as_tensor(data["average_net_pred"])
+    samples = torch.as_tensor(data["sample_preds"])
+    return avg_pred, samples
+
+
+def normalize_probability_tensors(
+    avg_pred: torch.Tensor,
+    samples: torch.Tensor,
+    probability_floor: float,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    # Uncertainty functions expect:
+    # [n_points, n_posterior_samples, n_models, n_classes]
     if samples.dim() == 3:
         samples = samples.unsqueeze(2)
 
+    # Convert logits to probabilities if needed.
     if samples.min() < 0 or samples.max() > 1:
+        print("Input appears to be logits. Applying softmax.")
         samples = torch.softmax(samples, dim=-1)
         avg_pred = torch.softmax(avg_pred, dim=-1)
-        
-    samples = torch.clamp(samples, min=1e-10, max=1.0)
-    avg_pred = torch.clamp(avg_pred, min=1e-10, max=1.0)
 
-    samples_sliced = samples[:, :N_SAMPLES, :, :]
-    
-    shape_for_b = samples_sliced                      
+    # Clamp to avoid log(0).
+    samples = torch.clamp(samples, min=probability_floor, max=1.0)
+    avg_pred = torch.clamp(avg_pred, min=probability_floor, max=1.0)
+    return avg_pred, samples
+
+
+def compute_uncertainties(config: Dict) -> Tuple[np.ndarray, np.ndarray]:
+    avg_pred, samples = load_prediction_tensors(config["dataset_name"], config["algorithm_name"])
+    avg_pred, samples = normalize_probability_tensors(
+        avg_pred=avg_pred,
+        samples=samples,
+        probability_floor=config["probability_floor"],
+    )
+
+    samples_sliced = samples[:, : config["n_samples"], :, :]
+    shape_for_b = samples_sliced
     shape_for_a = samples_sliced.permute(1, 2, 0, 3)
 
-    if math_setting == "A":
+    if config["math_setting"] == "A":
         math_results = calculate_uncertainty_setting_a(avg_pred, shape_for_a)
-    elif math_setting == "B":
+    elif config["math_setting"] == "B":
         math_results = calculate_uncertainty_setting_b(avg_pred, shape_for_b)
+    else:
+        raise ValueError(f"Unsupported math setting: {config['math_setting']}")
 
-    aleatoric = np.clip(math_results['aleatoric'].numpy(), a_min=1e-14, a_max=None)
-    epistemic = np.clip(math_results['epistemic'].numpy(), a_min=1e-14, a_max=None) 
-    
+    aleatoric = np.clip(
+        math_results["aleatoric"].numpy(),
+        a_min=config["value_clip_floor"],
+        a_max=None,
+    )
+    epistemic = np.clip(
+        math_results["epistemic"].numpy(),
+        a_min=config["value_clip_floor"],
+        a_max=None,
+    )
     return aleatoric, epistemic
 
-#loading data
-print("\n--- Loading Setting A ---")
-mcdo_al_A, mcdo_ep_A = get_uncertainties("mcdo", "A")
-ens_al_A, ens_ep_A = get_uncertainties("ensembles", "A")
-quam_al_A, quam_ep_A = get_uncertainties("quam", "A")
 
-print("\n--- Loading Setting B ---")
-mcdo_al_B, mcdo_ep_B = get_uncertainties("mcdo", "B")
-ens_al_B, ens_ep_B = get_uncertainties("ensembles", "B")
-quam_al_B, quam_ep_B = get_uncertainties("quam", "B")
+def summarize_results(aleatoric: np.ndarray, epistemic: np.ndarray) -> Dict[str, float]:
+    pearson_value, _ = pearsonr(aleatoric, epistemic)
+    spearman_value, _ = spearmanr(aleatoric, epistemic)
+    return {
+        "pearson": float(pearson_value),
+        "spearman": float(spearman_value),
+        "aleatoric_mean": float(np.mean(aleatoric)),
+        "epistemic_mean": float(np.mean(epistemic)),
+        "aleatoric_max": float(np.max(aleatoric)),
+        "epistemic_max": float(np.max(epistemic)),
+    }
 
-# DataFrame for A
-df_A = pd.DataFrame({
-    'MCDO Aleatoric': mcdo_al_A, 'MCDO Epistemic': mcdo_ep_A,
-    'Ens Aleatoric': ens_al_A, 'Ens Epistemic': ens_ep_A,
-    'QUAM Aleatoric': quam_al_A, 'QUAM Epistemic': quam_ep_A,
-    'Setting': 'Setting A' # Label for the Pairplot
-})
 
-# DataFrame for B
-df_B = pd.DataFrame({
-    'MCDO Aleatoric': mcdo_al_B, 'MCDO Epistemic': mcdo_ep_B,
-    'Ens Aleatoric': ens_al_B, 'Ens Epistemic': ens_ep_B,
-    'QUAM Aleatoric': quam_al_B, 'QUAM Epistemic': quam_ep_B,
-    'Setting': 'Setting B' # Label for the Pairplot
-})
+def run_scenario(scenario: Dict) -> Dict:
+    config = merge_config(BASE_CONFIG, scenario["overrides"])
+    os.makedirs(config["results_dir"], exist_ok=True)
 
-df_combined = pd.concat([df_A, df_B], ignore_index=True)
+    print(f"\n=== Running scenario: {scenario['name']} ===")
+    print(f"Parameters: {config}")
 
-#correlation matrices
-print("\nDrawing Side-by-Side Correlation Matrices...")
+    aleatoric, epistemic = compute_uncertainties(config)
+    limits = PLOT_SETTINGS[config["dataset_name"]]
 
-for corr_type in ['pearson', 'spearman']:
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=300)
-    fig.suptitle(f'{DATASET_NAME.upper()}: {corr_type.capitalize()} Correlation Comparison (A vs B)', fontsize=20, fontweight='bold', y=1.02)
+    figure_path = os.path.join(
+        config["results_dir"],
+        f"correlation_{config['algorithm_name'].upper()}_{config['dataset_name'].upper()}_setting_{config['math_setting']}_{scenario['name']}.png",
+    )
+    plot_uncertainty_correlation(
+        aleatoric=aleatoric,
+        epistemic=epistemic,
+        title=f"{config['algorithm_name'].upper()} Entangled Uncertainties ({config['dataset_name'].upper()}, Setting {config['math_setting']})",
+        filename=figure_path,
+        x_lims=limits["x_lim"],
+        y_lims=limits["y_lim"],
+    )
 
-    corr_A = df_A.drop(columns='Setting').corr(method=corr_type)
-    corr_B = df_B.drop(columns='Setting').corr(method=corr_type)
+    summary = summarize_results(aleatoric, epistemic)
+    return {
+        "scenario": scenario["name"],
+        "algorithm": config["algorithm_name"],
+        "dataset": config["dataset_name"],
+        "math_setting": config["math_setting"],
+        "n_samples": config["n_samples"],
+        "x_lim_min": limits["x_lim"][0],
+        "x_lim_max": limits["x_lim"][1],
+        "y_lim_min": limits["y_lim"][0],
+        "y_lim_max": limits["y_lim"][1],
+        "plot_file": figure_path,
+        **summary,
+    }
 
-    sns.heatmap(corr_A, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1, 
-                annot_kws={"size": 11}, ax=axes[0], cbar=False)
-    axes[0].set_title('Setting A', fontsize=16, pad=10)
-    plt.setp(axes[0].get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
 
-    sns.heatmap(corr_B, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1, 
-                annot_kws={"size": 11}, ax=axes[1])
-    axes[1].set_title('Setting B', fontsize=16, pad=10)
-    plt.setp(axes[1].get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+def main() -> None:
+    all_rows: List[Dict] = []
+    for scenario in EXPERIMENT_SCENARIOS:
+        all_rows.append(run_scenario(scenario))
 
-    plt.tight_layout()
-    corr_path = os.path.join(RESULTS_DIR, f'correlation_comparison_A_vs_B_{corr_type}_{DATASET_NAME}.png')
-    plt.savefig(corr_path, bbox_inches='tight')
-    plt.close()
-    print(f"Saved {corr_type.capitalize()} comparison matrix!")
+    summary_df = pd.DataFrame(all_rows)
+    summary_path = os.path.join(BASE_CONFIG["results_dir"], f"correlation_run_summary_{BASE_CONFIG['dataset_name']}.csv")
+    summary_df.to_csv(summary_path, index=False)
+    print(f"\nSaved summary table: {summary_path}")
+    print(summary_df.to_string(index=False))
 
-#pairplot
-print("Drawing Overlaid Pairplot (This might take a minute)...")
 
-numeric_cols = df_combined.columns.drop('Setting')
-df_combined[numeric_cols] = np.log10(df_combined[numeric_cols])
-
-sns.set_context("notebook", rc={"axes.labelsize": 14, "xtick.labelsize": 12, "ytick.labelsize": 12})
-
-pairplot = sns.pairplot(
-    df_combined, 
-    hue='Setting', 
-    palette={'Setting A': 'dodgerblue', 'Setting B': 'crimson'}, 
-    diag_kind='kde',
-    height=3, 
-    plot_kws={'alpha': 0.15, 's': 5, 'edgecolor': 'none'},
-    diag_kws={'linewidth': 2, 'fill': True, 'alpha': 0.3}
-)
-
-pairplot.fig.suptitle(f'{DATASET_NAME.upper()}: Log10 Overlaid Distributions (A vs B)', y=1.03, fontsize=24, fontweight='bold')
-
-sns.move_legend(
-    pairplot, "center left",         
-    bbox_to_anchor=(1.02, 0.5),       
-    ncol=1,                            
-    title=None, frameon=True, 
-    fontsize=18, markerscale=10
-)
-
-for lh in pairplot._legend.legend_handles:
-    lh.set_alpha(1.0)
-
-pairplot_path = os.path.join(RESULTS_DIR, f'pairplot_A_vs_B_combined_{DATASET_NAME}.png')
-pairplot.savefig(pairplot_path, dpi=300, bbox_inches='tight')
-print(f"Done! Saved MASSIVE Pairplot to: {pairplot_path}")
+if __name__ == "__main__":
+    main()
