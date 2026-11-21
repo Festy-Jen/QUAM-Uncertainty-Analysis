@@ -1,0 +1,10 @@
+dataset,method,prediction_file,original_command,model_checkpoint,checkpoint_hash,rng_seed,train_split,test_split,sample_positions,num_models,training_config,sampling_config,runtime_hardware,notes
+mnist,mcdo,data/mcdo_mnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+mnist,ensembles,data/ensembles_mnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+mnist,quam,data/quam_mnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+emnist,mcdo,data/mcdo_emnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+emnist,ensembles,data/ensembles_emnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+emnist,quam,data/quam_emnist_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+cifar10,mcdo,data/mcdo_cifar10_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+cifar10,ensembles,data/ensembles_cifar10_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
+cifar10,quam,data/quam_cifar10_preds.pkl,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,UNVERIFIED,Fill using your actual local runs; do not guess
