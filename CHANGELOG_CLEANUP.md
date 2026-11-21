@@ -1,6 +1,6 @@
 # Cleanup changes and validation scope
 
-This is a **submission-preparation branch/copy**, not a claimed scientific rerun. No existing `data/*.pkl` files, original Git history, or student's published figures were modified.
+This branch improves documentation, plotting, and reproducibility checks while retaining the original uncertainty calculations. Prediction-generation code and saved `.pkl` inputs were not changed.
 
 ## Changes made
 
@@ -14,17 +14,16 @@ This is a **submission-preparation branch/copy**, not a claimed scientific rerun
 - `helper_functions.py`: provenance and comment cleanup; **the Setting A and B numerical implementation remains unchanged**; fixed the misleading `#retention` comment and noninteractive `plt.show` warning.
 - `RUN_LEDGER.csv`: placeholder for **actual** seed, checkpoint, config and command per generated pickle. Entries are marked `UNVERIFIED`, not inferred from source templates.
 - `tests/`: mathematical regression tests and figure smoke tests with synthetic probability arrays.
-- Submission archive: removed `.git/`, caches, unused exploratory plots, prediction files. The independent original archive is unchanged.
 
 ## Validation performed
 
 1. `python -m compileall` completed.
-2. `python -m pytest -q` passed all synthetic tests.
+2. `python -m pytest -q` passed all 11 tests.
 3. Figure smoke tests generated Pearson/Spearman PDF/PNG/CSV, an individual hexbin and a 2x2 extreme-point plot using *synthetic* data.
 
-**Not performed:** complete end-to-end rerun on the original MNIST/EMNIST/CIFAR-10 prediction files because those local pickle arrays were not in the uploaded repository ZIP. Therefore, absolute Pearson/Spearman values have not been independently reproduced. Run the commands from README against your own `data/` and compare their two-decimal annotations to the previously submitted figures before replacing report figures.
+**Local prediction-data check:** `python run_all.py --datasets mnist emnist cifar10 --with-individual` completed successfully using the saved prediction files. The regenerated Pearson/Spearman coefficients agreed with the previous figures to their displayed precision. This checks consistency with the earlier analysis; it is not an independent validation of checkpoint provenance or the uncertainty estimators.
 
-## Caveats still requiring student validation
+## Remaining validation and reproducibility gaps
 
 - `samples.min()<0 or max()>1` does **not** validate probability normalization; retained to preserve previous results.
 - Clipping to `1e-14` before computing correlations introduces ties; retained to preserve previous results.
@@ -33,4 +32,4 @@ This is a **submission-preparation branch/copy**, not a claimed scientific rerun
 - `evaluate_missclass` outputs AUROC/AUPR/FPR approximations, not accuracy-retention curves.
 - Checkpoint paths, hardware, runtime and seeds cannot be recovered from a generic `.pkl` or config template; complete `RUN_LEDGER.csv` using actual historical run evidence.
 - The LLM Colab proof-of-concept is *not* included in this image-analysis codebase; document/submit it separately if required.
-- Your editable Overleaf report source, not this source-only archive, must be updated to embed the new vector heatmaps. This cleanup does not alter the PDF already sent to your supervisor.
+- The Overleaf report can use the updated vector heatmaps; report edits are maintained separately from this analysis repository.

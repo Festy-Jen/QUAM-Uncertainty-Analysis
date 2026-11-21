@@ -3,8 +3,8 @@
 Source: https://github.com/ml-jku/quam/blob/main/source/evaluation/uncertainty.py
 See README.md for attribution and numerical caveats.
 
-IMPORTANT: The Setting A/B implementations below have deliberately NOT been
-changed in this cleanup, so the student's original figures remain comparable.
+The Setting A/B implementations are preserved for comparison with the
+original figures. Changes to the estimators require separate validation.
 """
 
 import numpy as np

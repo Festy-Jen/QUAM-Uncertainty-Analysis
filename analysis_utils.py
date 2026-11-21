@@ -1,7 +1,7 @@
 """Shared loading and uncertainty post-processing for saved QUAM-format predictions.
 
 The transformations below intentionally retain the numerical conventions of the
-student's original 2026 analysis scripts; they are not a revised QUAM estimator.
+initial analysis scripts; they are not a revised QUAM estimator.
 Files are Python pickle objects and must come from trusted sources.
 """
 
