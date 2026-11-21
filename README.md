@@ -31,6 +31,7 @@ The original `pip freeze` from the development environment is preserved in `requ
 
 Put the **trusted** `.pkl` files generated from the original QUAM code in `data/`:
 
+
 ```text
 data/
   mcdo_mnist_preds.pkl
