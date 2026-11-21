@@ -1,3 +1,12 @@
+"""Uncertainty formulas and evaluation helpers adapted from the official QUAM code.
+
+Source: https://github.com/ml-jku/quam/blob/main/source/evaluation/uncertainty.py
+See README.md for attribution and numerical caveats.
+
+IMPORTANT: The Setting A/B implementations below have deliberately NOT been
+changed in this cleanup, so the student's original figures remain comparable.
+"""
+
 import numpy as np
 import torch
 from sklearn.metrics import roc_curve, roc_auc_score, auc, precision_recall_curve
@@ -93,7 +102,7 @@ def fpr_at_tpr_x(y_true, score, x=0.95):
     return fpr[(np.abs(tpr - x)).argmin()]
 
 
-#retention
+# Misclassification-detection metrics (not an accuracy–retention curve).
 def evaluate_missclass(
     id_uncerts,
     id_uncerts_target,
@@ -138,11 +147,14 @@ def plot_uncertainty_correlation(
     for spine in ['top', 'right']:
         ax.spines[spine].set_visible(False)
 
-    # colorbar with the temperature at the side
+    # The colorbar represents the logarithm of cell counts.
     cb = fig.colorbar(hb, ax=ax, shrink=0.8, pad=0.02)
-    cb.set_label('Log10', fontsize=10)
+    cb.set_label('Log10 count', fontsize=10)
 
     fig.tight_layout()
     fig.savefig(f"{filename}", bbox_inches='tight', dpi=300)
-    print(f"Success! Saved as {filename}")
-    plt.show()
+    print(f"Saved {filename}")
+    if plt.get_backend().lower() == "agg":
+        plt.close(fig)
+    else:
+        plt.show()
