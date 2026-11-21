@@ -124,6 +124,6 @@ draw_quadrant(axs[1, 1], ens_al_B, ens_ep_B, 'Ensembles', 'Setting B')
 plt.tight_layout(rect=[0, 0.03, 1, 0.95]) 
 save_path = os.path.join(RESULTS_DIR, f'quadrants_pubready_{DATASET_NAME}.png')
 
-# dpi=300 makes it high-resolution! bbox_inches='tight' trims empty borders!
+# dpi=300 makes it high-resolution, bbox_inches='tight' trims empty borders
 plt.savefig(save_path, dpi=300, bbox_inches='tight')
 print(f"Done! Publication-ready plot saved to: {save_path}")
