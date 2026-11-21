@@ -1,138 +1,141 @@
-import os
-import torch
-import pickle
+"""Correlation comparisons between Settings A and B across three methods.
+
+Scientific computations are kept identical to the original analysis. In
+particular, uncertainty is clipped at 1e-14 before calculating correlations.
+See README for implications and the upstream QUAM attribution.
+"""
+
+import argparse
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")  # Save files without requiring an interactive desktop.
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from helper_functions import calculate_uncertainty_setting_a, calculate_uncertainty_setting_b
 
-DATASET_NAME = "emnist"
-RESULTS_DIR = "results"
-N_SAMPLES = 1000
-os.makedirs(RESULTS_DIR, exist_ok=True)
-#------
-def get_uncertainties(algorithm_name, math_setting):
-    input_file = f"data/{algorithm_name}_{DATASET_NAME}_preds.pkl"
-    print(f"Loading {input_file} for Setting {math_setting}...")
-    
-    with open(input_file, 'rb') as f:
-        data = pickle.load(f)
+from analysis_utils import DATASETS, METHODS, calculate_uncertainties, load_predictions
 
-    avg_pred = torch.as_tensor(data['average_net_pred'])
-    samples = torch.as_tensor(data['sample_preds'])
+LABELS = {"mcdo": "MCDO", "ensembles": "Ens", "quam": "QUAM"}
+CMAP = plt.get_cmap("coolwarm")
+NORM = Normalize(vmin=-1, vmax=1)
 
-    if samples.dim() == 3:
-        samples = samples.unsqueeze(2)
 
-    if samples.min() < 0 or samples.max() > 1:
-        samples = torch.softmax(samples, dim=-1)
-        avg_pred = torch.softmax(avg_pred, dim=-1)
-        
-    samples = torch.clamp(samples, min=1e-10, max=1.0)
-    avg_pred = torch.clamp(avg_pred, min=1e-10, max=1.0)
+def plot_heatmap(ax, matrix, title, show_colorbar=False, font_size=16):
+    """Use high-contrast, bold values legible in an exported PDF."""
+    sns.heatmap(
+        matrix, ax=ax, annot=False, cmap=CMAP, vmin=-1, vmax=1,
+        cbar=show_colorbar, square=True, linewidths=0.7, linecolor="white",
+        cbar_kws={"shrink": 0.72, "label": "Correlation"} if show_colorbar else None,
+    )
+    ax.set_title(title, fontsize=17, fontweight="bold", pad=13)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=35, ha="right", fontsize=11)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=11)
+    ax.tick_params(length=0)
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            value = matrix.iloc[i, j]
+            if not np.isfinite(value):
+                color, label = "#161616", "n/a"
+            else:
+                red, green, blue, _ = CMAP(NORM(value))
+                def linear(c):
+                    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+                lum = (0.2126 * linear(red) + 0.7152 * linear(green)
+                       + 0.0722 * linear(blue))
+                color = "white" if lum < 0.18 else "#141414"
+                label = f"{value:.2f}"
+            ax.text(j + 0.5, i + 0.5, label, ha="center", va="center",
+                    fontsize=font_size, fontweight="bold", color=color)
 
-    samples_sliced = samples[:, :N_SAMPLES, :, :]
-    
-    shape_for_b = samples_sliced                      
-    shape_for_a = samples_sliced.permute(1, 2, 0, 3)
 
-    if math_setting == "A":
-        math_results = calculate_uncertainty_setting_a(avg_pred, shape_for_a)
-    elif math_setting == "B":
-        math_results = calculate_uncertainty_setting_b(avg_pred, shape_for_b)
+def render_matrices(frames, output_dir, dataset):
+    """Save vector PDF, high-resolution PNG, and full-precision coefficients."""
+    for kind in ("pearson", "spearman"):
+        matrices = {s: frame.corr(method=kind) for s, frame in frames.items()}
+        for setting, matrix in matrices.items():
+            matrix.to_csv(output_dir / f"correlation_{kind}_{dataset}_setting_{setting}.csv")
+            fig, ax = plt.subplots(figsize=(9, 7.5))
+            plot_heatmap(ax, matrix, f"{dataset.upper()} — {kind.title()} — Setting {setting}",
+                         show_colorbar=True, font_size=18)
+            fig.tight_layout(pad=1.2)
+            stem = output_dir / f"correlation_{kind}_{dataset}_setting_{setting}"
+            fig.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
+            fig.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+            plt.close(fig)
 
-    aleatoric = np.clip(math_results['aleatoric'].numpy(), a_min=1e-14, a_max=None)
-    epistemic = np.clip(math_results['epistemic'].numpy(), a_min=1e-14, a_max=None) 
-    
-    return aleatoric, epistemic
+        fig, axs = plt.subplots(1, 2, figsize=(18, 8))
+        fig.suptitle(f"{dataset.upper()}: {kind.title()} Correlation Comparison (A vs B)",
+                     fontsize=21, fontweight="bold", y=1.01)
+        plot_heatmap(axs[0], matrices["A"], "Setting A", font_size=17)
+        plot_heatmap(axs[1], matrices["B"], "Setting B", show_colorbar=True, font_size=17)
+        fig.tight_layout(pad=1.1)
+        stem = output_dir / f"correlation_comparison_A_vs_B_{kind}_{dataset}"
+        fig.savefig(stem.with_suffix(".pdf"), bbox_inches="tight")
+        fig.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved {kind} comparisons to {output_dir}")
 
-#loading data
-print("\n--- Loading Setting A ---")
-mcdo_al_A, mcdo_ep_A = get_uncertainties("mcdo", "A")
-ens_al_A, ens_ep_A = get_uncertainties("ensembles", "A")
-quam_al_A, quam_ep_A = get_uncertainties("quam", "A")
 
-print("\n--- Loading Setting B ---")
-mcdo_al_B, mcdo_ep_B = get_uncertainties("mcdo", "B")
-ens_al_B, ens_ep_B = get_uncertainties("ensembles", "B")
-quam_al_B, quam_ep_B = get_uncertainties("quam", "B")
+def render_pairplot(frames, output_dir, dataset, limit=10000):
+    """Optional exploratory plot; omitted from the default command for speed."""
+    items = []
+    for setting, frame in frames.items():
+        subset = frame.iloc[:limit].copy()
+        subset["Setting"] = f"Setting {setting}"
+        items.append(subset)
+    frame = pd.concat(items, ignore_index=True)
+    cols = list(frames["A"].columns)
+    frame[cols] = np.log10(frame[cols])
+    sns.set_context("notebook", rc={"axes.labelsize": 13, "xtick.labelsize": 11,
+                                     "ytick.labelsize": 11})
+    pair = sns.pairplot(
+        frame, hue="Setting", palette={"Setting A": "dodgerblue", "Setting B": "crimson"},
+        diag_kind="kde", height=2.7,
+        plot_kws={"alpha": 0.15, "s": 5, "edgecolor": "none"},
+        diag_kws={"linewidth": 2, "fill": True, "alpha": 0.25},
+    )
+    pair.fig.suptitle(f"{dataset.upper()}: log10 score distributions (A vs B)",
+                      fontsize=19, fontweight="bold", y=1.02)
+    pair.savefig(output_dir / f"pairplot_A_vs_B_combined_{dataset}.png", dpi=200,
+                 bbox_inches="tight")
+    plt.close(pair.fig)
 
-# DataFrame for A
-df_A = pd.DataFrame({
-    'MCDO Aleatoric': mcdo_al_A, 'MCDO Epistemic': mcdo_ep_A,
-    'Ens Aleatoric': ens_al_A, 'Ens Epistemic': ens_ep_A,
-    'QUAM Aleatoric': quam_al_A, 'QUAM Epistemic': quam_ep_A,
-    'Setting': 'Setting A' # Label for the Pairplot
-})
 
-# DataFrame for B
-df_B = pd.DataFrame({
-    'MCDO Aleatoric': mcdo_al_B, 'MCDO Epistemic': mcdo_ep_B,
-    'Ens Aleatoric': ens_al_B, 'Ens Epistemic': ens_ep_B,
-    'QUAM Aleatoric': quam_al_B, 'QUAM Epistemic': quam_ep_B,
-    'Setting': 'Setting B' # Label for the Pairplot
-})
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=DATASETS, default="cifar10")
+    parser.add_argument("--n-samples", type=int, default=1000,
+                        help="Maximum trajectory/sample positions (not test images)")
+    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument("--results-dir", type=Path, default=Path("results"))
+    parser.add_argument("--pairplot", action="store_true", help="Also generate large pairplot")
+    parser.add_argument("--pairplot-points", type=int, default=10000)
+    args = parser.parse_args(argv)
+    args.results_dir.mkdir(parents=True, exist_ok=True)
 
-df_combined = pd.concat([df_A, df_B], ignore_index=True)
+    col_data = {"A": {}, "B": {}}
+    reference_targets = None
+    for method in METHODS:
+        avg, samples, targets = load_predictions(args.data_dir, method, args.dataset,
+                                                  args.n_samples)
+        if reference_targets is None:
+            reference_targets = targets
+        elif not np.array_equal(targets.cpu().numpy(), reference_targets.cpu().numpy()):
+            raise ValueError(f"Targets differ for {method}: test-index alignment must be fixed")
+        for setting in ("A", "B"):
+            aleatoric, epistemic = calculate_uncertainties(avg, samples, setting)
+            col_data[setting][f"{LABELS[method]} Aleatoric"] = aleatoric
+            col_data[setting][f"{LABELS[method]} Epistemic"] = epistemic
+        del avg, samples, targets
+    frames = {s: pd.DataFrame(cols) for s, cols in col_data.items()}
+    render_matrices(frames, args.results_dir, args.dataset)
+    if args.pairplot:
+        render_pairplot(frames, args.results_dir, args.dataset, args.pairplot_points)
+    print("Note: matching target labels is necessary but not sufficient to establish image alignment.")
 
-#correlation matrices
-print("\nDrawing Side-by-Side Correlation Matrices...")
 
-for corr_type in ['pearson', 'spearman']:
-    fig, axes = plt.subplots(1, 2, figsize=(18, 8), dpi=300)
-    fig.suptitle(f'{DATASET_NAME.upper()}: {corr_type.capitalize()} Correlation Comparison (A vs B)', fontsize=20, fontweight='bold', y=1.02)
-
-    corr_A = df_A.drop(columns='Setting').corr(method=corr_type)
-    corr_B = df_B.drop(columns='Setting').corr(method=corr_type)
-
-    sns.heatmap(corr_A, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1, 
-                annot_kws={"size": 11}, ax=axes[0], cbar=False)
-    axes[0].set_title('Setting A', fontsize=16, pad=10)
-    plt.setp(axes[0].get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
-
-    sns.heatmap(corr_B, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1, 
-                annot_kws={"size": 11}, ax=axes[1])
-    axes[1].set_title('Setting B', fontsize=16, pad=10)
-    plt.setp(axes[1].get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
-
-    plt.tight_layout()
-    corr_path = os.path.join(RESULTS_DIR, f'correlation_comparison_A_vs_B_{corr_type}_{DATASET_NAME}.png')
-    plt.savefig(corr_path, bbox_inches='tight')
-    plt.close()
-    print(f"Saved {corr_type.capitalize()} comparison matrix!")
-
-#pairplot
-print("Drawing Overlaid Pairplot (This might take a minute)...")
-
-numeric_cols = df_combined.columns.drop('Setting')
-df_combined[numeric_cols] = np.log10(df_combined[numeric_cols])
-
-sns.set_context("notebook", rc={"axes.labelsize": 14, "xtick.labelsize": 12, "ytick.labelsize": 12})
-
-pairplot = sns.pairplot(
-    df_combined, 
-    hue='Setting', 
-    palette={'Setting A': 'dodgerblue', 'Setting B': 'crimson'}, 
-    diag_kind='kde',
-    height=3, 
-    plot_kws={'alpha': 0.15, 's': 5, 'edgecolor': 'none'},
-    diag_kws={'linewidth': 2, 'fill': True, 'alpha': 0.3}
-)
-
-pairplot.fig.suptitle(f'{DATASET_NAME.upper()}: Log10 Overlaid Distributions (A vs B)', y=1.03, fontsize=24, fontweight='bold')
-
-sns.move_legend(
-    pairplot, "center left",         
-    bbox_to_anchor=(1.02, 0.5),       
-    ncol=1,                            
-    title=None, frameon=True, 
-    fontsize=18, markerscale=10
-)
-
-for lh in pairplot._legend.legend_handles:
-    lh.set_alpha(1.0)
-
-pairplot_path = os.path.join(RESULTS_DIR, f'pairplot_A_vs_B_combined_{DATASET_NAME}.png')
-pairplot.savefig(pairplot_path, dpi=300, bbox_inches='tight')
-print(f"Done! Saved MASSIVE Pairplot to: {pairplot_path}")
+if __name__ == "__main__":
+    main()
