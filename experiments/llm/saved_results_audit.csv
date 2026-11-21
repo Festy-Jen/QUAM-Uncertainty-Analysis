@@ -1,0 +1,3 @@
+dataset,questions,variants,finite,nonfinite,pct_finite,median_mass
+MAQA*,592,2669,2666,3,99.89,0.957
+AmbigQA*,4377,12920,306,12614,2.37,0.9307
