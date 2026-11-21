@@ -9,10 +9,17 @@ matplotlib.use("Agg")
 from analysis_utils import DATASETS, METHODS, calculate_uncertainties, load_predictions
 from helper_functions import plot_uncertainty_correlation
 
-PLOT_SETTINGS = {
+DATASET_LIMITS = {
     "mnist": ((1e-15, 1e6), (1e-15, 1e6)),
     "emnist": ((1e-13, 1e1), (1e-14, 1e0)),
     "cifar10": ((1e-4, 5e1), (1e-5, 5e1)),
+}
+
+PLOT_OVERRIDES = {
+    ("quam", "mnist", "A"): ((1e-3, 2), (1e-3, 2)),
+    ("quam", "mnist", "B"): ((1e-8, 2), (1e-4, 2)),
+    ("mcdo", "mnist", "A"): ((1e-9, 2), (1e-14, 2)),
+    ("quam", "cifar10", "B"): ((1e-3, 5), (1e-1, 20)),
 }
 
 
@@ -32,7 +39,12 @@ def main(argv=None):
     avg, samples, _ = load_predictions(args.data_dir, args.algorithm, args.dataset,
                                        args.n_samples)
     aleatoric, epistemic = calculate_uncertainties(avg, samples, args.setting)
-    xlim, ylim = PLOT_SETTINGS[args.dataset]
+    key = (args.algorithm, args.dataset, args.setting)
+
+    xlim, ylim = PLOT_OVERRIDES.get(
+        key,
+        DATASET_LIMITS[args.dataset]
+    )
     path = args.results_dir / (
         f"correlation_{args.algorithm.upper()}_{args.dataset.upper()}_setting_{args.setting}.png"
     )
